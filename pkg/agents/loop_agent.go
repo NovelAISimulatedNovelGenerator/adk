@@ -17,7 +17,6 @@ package agents
 
 import (
 	"context"
-	"fmt"
 )
 
 // LoopAgent runs its sub-agents repeatedly until a condition is met or max iterations is reached.
@@ -56,27 +55,22 @@ func NewLoopAgent(config LoopAgentConfig) *LoopAgent {
 // Process handles a message by processing it through all sub-agents repeatedly.
 func (a *LoopAgent) Process(ctx context.Context, message string) (string, error) {
 	currentMessage := message
+	var response string
 	var err error
-	iterations := 0
 
-	// Continue looping until max iterations is reached
-	for iterations < a.maxIterations {
-		iterations++
+	for i := 0; i < a.maxIterations; i++ {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		default:
+		}
 
-		// Process through each sub-agent in sequence
 		for _, subAgent := range a.subAgents {
-			currentMessage, err = subAgent.Process(ctx, currentMessage)
+			response, err = subAgent.Process(ctx, currentMessage)
 			if err != nil {
 				return "", err
 			}
-
-			// Check for context cancellation
-			select {
-			case <-ctx.Done():
-				return currentMessage, fmt.Errorf("loop agent terminated: %v", ctx.Err())
-			default:
-				// Continue processing
-			}
+			currentMessage = response
 		}
 	}
 

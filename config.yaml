@@ -1,0 +1,12 @@
+# ADK 全局配置示例
+plugin_dir: ./plugins
+default_flow: novel_flow_v1
+log_level: info
+
+db:
+  dsn: "postgres://user:pass@localhost:5432/adk?sslmode=disable"
+
+queue:
+  impl: redis
+  addr: "redis://localhost:6379"
+  stream: adk_tasks

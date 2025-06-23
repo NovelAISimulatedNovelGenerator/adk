@@ -51,13 +51,19 @@ func (a *SequentialAgent) Process(ctx context.Context, message string) (string, 
 
 	// Process through each sub-agent in sequence
 	for _, subAgent := range a.subAgents {
-		currentMessage, err = subAgent.Process(ctx, currentMessage)
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		default:
+		}
+
+		response, err = subAgent.Process(ctx, currentMessage)
 		if err != nil {
 			return "", err
 		}
+		currentMessage = response
 	}
 
-	response = currentMessage
 	return response, nil
 }
 

@@ -430,6 +430,9 @@ func (a *Agent) ParentAgent() *Agent {
 
 // Run executes the agent with the given invocation context
 func (a *Agent) Run(ctx context.Context, invocationContext *InvocationContext) (<-chan *events.Event, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	invocationContext.SetCancelFunc(cancel)
+
 	eventCh := make(chan *events.Event)
 
 	// Create a span for tracking this processing

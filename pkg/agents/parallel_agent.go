@@ -48,32 +48,36 @@ func NewParallelAgent(config ParallelAgentConfig) *ParallelAgent {
 // Process handles a message by processing it through all sub-agents in parallel.
 func (a *ParallelAgent) Process(ctx context.Context, message string) (string, error) {
 	var wg sync.WaitGroup
-	responses := make([]string, len(a.subAgents))
-	errors := make([]error, len(a.subAgents))
+	responses := make(chan string, len(a.subAgents))
 
-	// Process through each sub-agent in parallel
-	for i, subAgent := range a.subAgents {
+	for _, subAgent := range a.subAgents {
 		wg.Add(1)
-		go func(idx int, agent *Agent) {
+		go func(sa *Agent) {
 			defer wg.Done()
-			resp, err := agent.Process(ctx, message)
-			responses[idx] = resp
-			errors[idx] = err
-		}(i, subAgent)
+			response, err := sa.Process(ctx, message)
+			if err != nil {
+				// TODO: Better error handling
+				return
+			}
+			select {
+			case responses <- response:
+			case <-ctx.Done():
+				return
+			}
+		}(subAgent)
 	}
 
-	// Wait for all sub-agents to complete
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(responses)
+	}()
 
-	// Check for errors
-	for _, err := range errors {
-		if err != nil {
-			return "", err
-		}
+	var allResponses []string
+	for response := range responses {
+		allResponses = append(allResponses, response)
 	}
 
-	// Combine responses
-	return strings.Join(responses, "\n\n"), nil
+	return strings.Join(allResponses, "\n"), nil
 }
 
 // SubAgents returns the sub-agents of this parallel agent.

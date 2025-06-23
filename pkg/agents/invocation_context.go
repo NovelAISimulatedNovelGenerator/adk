@@ -15,6 +15,7 @@
 package agents
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/nvcnvn/adk-golang/pkg/events"
@@ -114,6 +115,7 @@ type InvocationContext struct {
 
 	// ActiveStreamingTools holds active streaming tools
 	ActiveStreamingTools map[string]*ActiveStreamingTool `json:"-"`
+	cancelFunc           context.CancelFunc
 }
 
 // NewInvocationContext creates a new InvocationContext
@@ -157,8 +159,20 @@ func (ctx *InvocationContext) SetEndInvocation(end bool) {
 }
 
 // GetTranscriptionCache returns the transcription cache
-func (ctx *InvocationContext) GetTranscriptionCache() interface{} {
-	return ctx.TranscriptionCache
+func (ic *InvocationContext) GetTranscriptionCache() interface{} {
+	return ic.TranscriptionCache
+}
+
+// SetCancelFunc stores the cancel function for the invocation context.
+func (ic *InvocationContext) SetCancelFunc(cf context.CancelFunc) {
+	ic.cancelFunc = cf
+}
+
+// Cancel invokes the cancel function for the invocation context.
+func (ic *InvocationContext) Cancel() {
+	if ic.cancelFunc != nil {
+		ic.cancelFunc()
+	}
 }
 
 // CallbackContext represents a context for agent callbacks

@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/secretmanager v1.14.7
 	cloud.google.com/go/storage v1.55.0
 	github.com/fatih/color v1.18.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.9.1
