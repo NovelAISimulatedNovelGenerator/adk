@@ -6,6 +6,9 @@ package novel
 import (
     "context"
     "fmt"
+    "log"
+    "strings"
+    "sync"
 
     "github.com/nvcnvn/adk-golang/pkg/agents"
 )
@@ -88,28 +91,128 @@ func Build() *agents.Agent {
         SubAgents:   []*agents.Agent{&decisionLayer.Agent, &executionLayer.Agent},
     })
 
-    // 设置回调
+    // 设置子代理处理逻辑
+    // 注意：避免在回调中调用自身Process方法，防止无限递归
+    
+    // 决策层处理逻辑
     decisionLayer.Agent.SetBeforeAgentCallback(func(ctx context.Context, msg string) (string, bool) {
-        res, err := decisionLayer.Process(ctx, msg)
+        log.Println("[决策层] 处理输入：", truncateString(msg, 30))
+        // 依次调用子代理，而非recursively调用整个决策层Process
+        currentMessage := msg
+        
+        // 策略分析
+        strategyMsg, err := strategy.Process(ctx, currentMessage)
         if err != nil {
-            return fmt.Sprintf("error: %v", err), true
+            return fmt.Sprintf("[策略层错误]: %v", err), true
         }
-        return res, true
+        currentMessage = strategyMsg
+        
+        // 规划执行
+        planMsg, err := planner.Process(ctx, currentMessage)
+        if err != nil {
+            return fmt.Sprintf("[规划层错误]: %v", err), true
+        }
+        currentMessage = planMsg
+        
+        // 评估结果
+        evalMsg, err := evaluator.Process(ctx, currentMessage)
+        if err != nil {
+            return fmt.Sprintf("[评估层错误]: %v", err), true
+        }
+        
+        log.Println("[决策层] 完成处理")
+        return evalMsg, true
     })
+    
+    // 执行层处理逻辑
     executionLayer.Agent.SetBeforeAgentCallback(func(ctx context.Context, msg string) (string, bool) {
-        res, err := executionLayer.Process(ctx, msg)
-        if err != nil {
-            return fmt.Sprintf("error: %v", err), true
+        log.Println("[执行层] 处理输入：", truncateString(msg, 30))
+        
+        // 收集所有子代理的结果
+        type agentResult struct {
+            agent string
+            output string
+            err error
         }
-        return res, true
+        
+        resultsCh := make(chan agentResult, len(executionLayer.SubAgents()))
+        var wg sync.WaitGroup
+        
+        // 并行调用所有子代理
+        for _, subAgent := range executionLayer.SubAgents() {
+            if subAgent == formatter { // 格式化代理最后处理
+                continue
+            }
+            
+            wg.Add(1)
+            go func(agent *agents.Agent) {
+                defer wg.Done()
+                output, err := agent.Process(ctx, msg)
+                resultsCh <- agentResult{agent.Name(), output, err}
+            }(subAgent)
+        }
+        
+        // 等待所有子代理完成
+        wg.Wait()
+        close(resultsCh)
+        
+        // 收集结果
+        results := make(map[string]string)
+        for result := range resultsCh {
+            if result.err != nil {
+                log.Printf("[执行层] 子代理 %s 错误: %v", result.agent, result.err)
+                continue
+            }
+            results[result.agent] = result.output
+        }
+        
+        // 合并结果供formatter使用
+        formatterInput := fmt.Sprintf("子代理结果:\n%s", formatResults(results))
+        formatterOutput, err := formatter.Process(ctx, formatterInput)
+        if err != nil {
+            return fmt.Sprintf("[格式化错误]: %v", err), true
+        }
+        
+        log.Println("[执行层] 完成处理")
+        return formatterOutput, true
     })
+    
+    // 根代理处理逻辑
     root.Agent.SetBeforeAgentCallback(func(ctx context.Context, msg string) (string, bool) {
-        resp, err := root.Process(ctx, msg)
+        log.Println("[根代理] 处理输入：", truncateString(msg, 30))
+        
+        // 决策层处理
+        decisionOutput, err := decisionLayer.Agent.Process(ctx, msg)
         if err != nil {
-            return fmt.Sprintf("error: %v", err), true
+            return fmt.Sprintf("[决策层错误]: %v", err), true
         }
-        return resp, true
+        
+        // 执行层处理
+        executionOutput, err := executionLayer.Agent.Process(ctx, decisionOutput)
+        if err != nil {
+            return fmt.Sprintf("[执行层错误]: %v", err), true
+        }
+        
+        log.Println("[根代理] 完成处理")
+        return executionOutput, true
     })
 
     return &root.Agent
+}
+
+// truncateString 截断字符串到指定长度，并添加省略号
+func truncateString(s string, maxLen int) string {
+    if len(s) <= maxLen {
+        return s
+    }
+    return s[:maxLen] + "..."
+}
+
+// formatResults 将子代理结果格式化为字符串
+func formatResults(results map[string]string) string {
+    var sb strings.Builder
+    for agent, output := range results {
+        sb.WriteString(fmt.Sprintf("%s: %s\n", agent, truncateString(output, 100)))
+    }
+    return sb.String()
 }

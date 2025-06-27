@@ -18,6 +18,7 @@ package agents
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"fmt"
 	"sync"
 
@@ -318,8 +319,20 @@ func (a *Agent) Process(ctx context.Context, message string) (string, error) {
 		}
 	}
 
+	// 检查上下文是否已取消，避免不必要的模型调用
+	select {
+	case <-ctx.Done():
+		log.Printf("[Agent] 模型调用被上下文取消，agent: %s, 原因: %v", a.name, ctx.Err())
+		span.SetAttribute("context_canceled", "true")
+		return "", ctx.Err()
+	default:
+		// 继续执行
+	}
+
 	// Generate response
+	log.Printf("[Agent] 开始模型调用，agent: %s, 模型: %s", a.name, a.model)
 	response, err := model.Generate(ctx, msgs)
+	log.Printf("[Agent] 模型调用完成，agent: %s, 成功: %v", a.name, err == nil)
 	if err != nil {
 		span.SetAttribute("error", err.Error())
 		return "", err

@@ -1,0 +1,5 @@
+# ADK 配置文件
+plugin_dir: "/home/kiz/Code/adk-golang/plugins"
+default_flow: "novel_flow_v1"
+db_dsn: "sqlite3://adk.db"
+log_level: "debug"
