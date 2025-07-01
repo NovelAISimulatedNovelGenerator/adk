@@ -12,6 +12,7 @@ type Config struct {
 	PluginDir   string `yaml:"plugin_dir"`
 	DefaultFlow string `yaml:"default_flow"`
 	LogLevel    string `yaml:"log_level"`
+	LogDev      bool   `yaml:"log_dev"`
 
 	DB struct {
 		DSN string `yaml:"dsn"`
@@ -44,5 +45,7 @@ func Load(path string) (*Config, error) {
 	if cfg.LogLevel == "" {
 		cfg.LogLevel = "info"
 	}
+	// 默认非开发模式
+	
 	return &cfg, nil
 }

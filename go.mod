@@ -15,6 +15,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+require go.uber.org/multierr v1.10.0 // indirect
+
 require (
 	cel.dev/expr v0.20.0 // indirect
 	cloud.google.com/go v0.121.1 // indirect
@@ -53,6 +55,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.36.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.36.0 // indirect
 	go.opentelemetry.io/otel/trace v1.36.0 // indirect
+	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect

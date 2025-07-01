@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"github.com/nvcnvn/adk-golang/pkg/logger"
 	"net/http"
 	"os"
 	"os/signal"
@@ -70,7 +71,10 @@ func main() {
 		}
 	}()
 	
-	log.Printf("API 服务启动完成，可用工作流: %v", manager.ListNames())
+	// 重新根据配置初始化结构化日志
+	_, _ = logger.Init(cfg.LogLevel, cfg.LogDev)
+
+	logger.S().Infow("API 服务启动完成", "workflows", manager.ListNames())
 	
 	// 等待退出信号
 	sig := <-sigCh

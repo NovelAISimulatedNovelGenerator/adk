@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,20 +11,33 @@ import (
 	"time"
 
 	"github.com/nvcnvn/adk-golang/pkg/flow"
+	"github.com/nvcnvn/adk-golang/pkg/scheduler"
 )
 
 // HttpServer 提供 HTTP API 服务
 type HttpServer struct {
 	service *WorkflowService
+	sched   scheduler.Scheduler
 	addr    string
 	server  *http.Server
 }
 
 // NewHttpServer 创建 HTTP API 服务器
 func NewHttpServer(manager *flow.Manager, addr string) *HttpServer {
-	service := NewWorkflowService(manager)
+	// 创建调度器，默认 8 workers, 队列 32
+	proc := func(ctx context.Context, task *scheduler.Task) (string, error) {
+		ag, ok := manager.Get(task.Workflow)
+		if !ok {
+			return "", errors.New("workflow not found")
+		}
+		return ag.Process(ctx, task.Input)
+	}
+	sched := scheduler.NewWorkerPoolScheduler(8, 32, proc)
+	sched.Start()
+	service := NewWorkflowService(manager, sched)
 	return &HttpServer{
 		service: service,
+		sched:   sched,
 		addr:    addr,
 	}
 }

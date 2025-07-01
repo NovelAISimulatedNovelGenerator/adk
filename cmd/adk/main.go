@@ -52,6 +52,7 @@ import (
     "fmt"
     "os"
     "time"
+    "github.com/nvcnvn/adk-golang/pkg/logger"
 
     "github.com/nvcnvn/adk-golang/pkg/agents"
     "github.com/nvcnvn/adk-golang/pkg/cli"
@@ -74,6 +75,9 @@ func init() {
         fmt.Fprintf(os.Stderr, "加载配置失败: %v\n", err)
         os.Exit(1)
     }
+
+    // 初始化结构化日志
+    _, _ = logger.Init(cfg.LogLevel, cfg.LogDev)
 
     // 初始化插件 Manager 与 Loader
     mgr := flow.NewManager()

@@ -9,6 +9,7 @@ import (
 
 	"github.com/nvcnvn/adk-golang/pkg/agents"
 	"github.com/nvcnvn/adk-golang/pkg/flow"
+	"github.com/nvcnvn/adk-golang/pkg/scheduler"
 )
 
 // 定义 API 常量与错误类型
@@ -45,14 +46,16 @@ type StreamCallback func(data string, done bool, err error)
 
 // WorkflowService 提供工作流执行服务
 type WorkflowService struct {
-	manager    *flow.Manager
+	manager *flow.Manager
+	sched   scheduler.Scheduler
 	activeJobs sync.Map // 记录活跃的工作
 }
 
 // NewWorkflowService 创建工作流服务
-func NewWorkflowService(manager *flow.Manager) *WorkflowService {
+func NewWorkflowService(manager *flow.Manager, sched scheduler.Scheduler) *WorkflowService {
 	return &WorkflowService{
 		manager: manager,
+		sched:   sched,
 	}
 }
 
@@ -75,51 +78,39 @@ func (s *WorkflowService) Execute(ctx context.Context, req WorkflowRequest) (*Wo
 	defer cancel()
 	
 	// 获取工作流
-	agent, exists := s.manager.Get(req.Workflow)
-	if !exists {
+	// 检查工作流是否存在
+	if _, exists := s.manager.Get(req.Workflow); !exists {
 		log.Printf("[API] 工作流 %s 未找到", req.Workflow)
 		return errorResponse(req.Workflow, "工作流未找到", req.TraceId), ErrWorkflowNotFound
 	}
 	
-	// 执行结果通道
-	type resultType struct {
-		output string
-		err    error
-	}
-	resultCh := make(chan resultType, 1)
-	
-	// 执行工作流（使用 goroutine 防止阻塞）
-	log.Printf("[API] 开始执行工作流 %s，TraceID: %s，超时: %d秒", req.Workflow, req.TraceId, req.Timeout)
-	go func() {
-		log.Printf("[API] 工作流 %s 已启动异步处理，TraceID: %s", req.Workflow, req.TraceId)
-		
-		// 创建同步版上下文（不使用超时）
-		// 尝试不同的上下文类型，因为可能是超时上下文影响了模型调用
-		// syncCtx := context.Background()
-		
-		log.Printf("[API] 工作流 %s 调用 agent.Process，TraceID: %s", req.Workflow, req.TraceId)
-		output, err := agent.Process(timeoutCtx, req.Input)
-		
-		if err != nil {
-			log.Printf("[API] 工作流 %s 执行错误: %v，TraceID: %s", req.Workflow, err, req.TraceId)
-		} else {
-			log.Printf("[API] 工作流 %s 执行成功，返回结果长度: %d，TraceID: %s", req.Workflow, len(output), req.TraceId)
-		}
-		
-		resultCh <- resultType{output, err}
-	}()
-	
-	// 等待结果或超时
-	var output string
-	var err error
-	select {
-	case result := <-resultCh:
-		output, err = result.output, result.err
-		log.Printf("[API] 工作流 %s 执行完成，TraceID: %s", req.Workflow, req.TraceId)
-	case <-timeoutCtx.Done():
-		log.Printf("[API] 工作流 %s 执行超时，TraceID: %s", req.Workflow, req.TraceId)
-		return errorResponse(req.Workflow, "工作流执行超时", req.TraceId), timeoutCtx.Err()
-	}
+    // 通过调度器提交任务
+    resultCh := make(chan scheduler.Result, 1)
+    task := &scheduler.Task{
+        Ctx:        timeoutCtx,
+        Workflow:   req.Workflow,
+        Input:      req.Input,
+        UserID:     req.UserId,
+        ResultChan: resultCh,
+    }
+
+    if err := s.sched.Submit(task); err != nil {
+        if err == scheduler.ErrQueueFull {
+            return errorResponse(req.Workflow, "系统繁忙，请稍后再试", req.TraceId), err
+        }
+        return errorResponse(req.Workflow, "提交任务失败", req.TraceId), err
+    }
+
+    // 等待结果或超时
+    var output string
+    var err error
+    select {
+    case res := <-resultCh:
+        output, err = res.Output, res.Err
+    case <-timeoutCtx.Done():
+        return errorResponse(req.Workflow, "工作流执行超时", req.TraceId), timeoutCtx.Err()
+    }
+
 	
 	// 处理执行错误
 	if err != nil {
