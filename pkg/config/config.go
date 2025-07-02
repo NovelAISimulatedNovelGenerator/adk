@@ -6,6 +6,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// EndpointConfig 定义API端点配置
+type EndpointConfig struct {
+	URL    string `yaml:"url"`    // API端点URL
+	APIKey string `yaml:"apikey"` // API密钥
+}
+
+// ModelPoolConfig 定义单个模型API池配置
+type ModelPoolConfig struct {
+	Base      string           `yaml:"base"`      // 基础模型类型：deepseek/gemini等
+	Endpoints []EndpointConfig `yaml:"endpoints"` // 端点列表
+}
+
 // Config 代表全局配置文件结构，与 config.yaml 对齐。
 // 字段保持首字母大写以便 yaml 解码。
 type Config struct {
@@ -23,6 +35,9 @@ type Config struct {
 		Addr   string `yaml:"addr"`
 		Stream string `yaml:"stream"`
 	} `yaml:"queue"`
+	
+	// ModelAPIPools 配置多个API端点池，按模型类型分组
+	ModelAPIPools map[string]ModelPoolConfig `yaml:"model_api_pools"`
 }
 
 // Load 从 path 读取 yaml，如 path 为空则默认 ./config.yaml。

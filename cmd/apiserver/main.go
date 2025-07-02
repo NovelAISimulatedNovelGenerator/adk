@@ -14,6 +14,7 @@ import (
 	"github.com/nvcnvn/adk-golang/pkg/api"
 	"github.com/nvcnvn/adk-golang/pkg/config"
 	"github.com/nvcnvn/adk-golang/pkg/flow"
+	"github.com/nvcnvn/adk-golang/pkg/models"
 )
 
 var (
@@ -38,6 +39,12 @@ func main() {
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
+	}
+	
+	// 注册模型API池
+	log.Printf("注册模型API池...")
+	if err := models.RegisterModelPools(cfg); err != nil {
+		log.Printf("注册模型API池失败: %v", err)
 	}
 	
 	// 创建管理器

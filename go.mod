@@ -10,12 +10,17 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.9.1
+	github.com/stretchr/testify v1.10.0
 	golang.org/x/oauth2 v0.30.0
 	google.golang.org/api v0.235.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require go.uber.org/multierr v1.10.0 // indirect
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+)
 
 require (
 	cel.dev/expr v0.20.0 // indirect
