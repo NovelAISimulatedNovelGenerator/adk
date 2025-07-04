@@ -53,9 +53,178 @@ ADK-Golang (Agent Development Kit) 试图提供一套 **可扩展、可组合、
 
 ---
 
-> _最后更新: 2025-06-22_  
-> 如有疑问或建议，请在 Discussion 中反馈。
+## API 接口文档
 
-我希望配置一个代码工作流，使用adk-golang实现，专注于处理来自内网的api请求，因为本身是高并发服务，所以需要能够多线程处理，queue等系统。支持json文件配置多种工作流 例如在cmd/adk/main中的整个工作流作为一个json文件，然后通过json文件名/其他方式选择使用。
-可以是通过Hertz-adk_api双端通信 -> 初始化(通过json文件配置)服务 -> 使用服务 -> 断开通信 -> 销毁服务
-你需要仔细思考系统架构，保持架构的鲁棒性，你需要持有批判性思维，你需要提问以完善架构
+> 本节提供 ADK-Golang API 服务接口规范，供 Hertz 等外部服务集成调用
+
+### 基础信息
+
+- **基础路径**：`/api`
+- **内容类型**：`application/json`
+- **认证方式**：目前仅支持基本认证，后续计划支持 JWT
+
+### 端点概览
+
+| 路径 | 方法 | 说明 | 参数位置 |
+|------|------|------|----------|
+| `/health` | GET | 服务健康检查 | - |
+| `/api/workflows` | GET | 获取可用工作流列表 | - |
+| `/api/workflows/{name}` | GET | 获取特定工作流详情 | 路径参数 |
+| `/api/execute` | POST | 执行工作流（同步） | 请求体 |
+| `/api/stream` | POST | 执行工作流（流式） | 请求体 |
+
+### 1. 健康检查
+
+```
+GET /health
+```
+
+**响应示例**：
+
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "time": "2025-07-02T16:25:12Z",
+  "workflows": 3,
+  "workflow_names": ["novel_flow_v1", "novel_flow_v2", "text_summarizer"]
+}
+```
+
+### 2. 获取工作流列表
+
+```
+GET /api/workflows
+```
+
+**响应示例**：
+
+```json
+{
+  "workflows": ["novel_flow_v1", "novel_flow_v2", "text_summarizer"],
+  "count": 3
+}
+```
+
+### 3. 获取工作流详情
+
+```
+GET /api/workflows/{name}
+```
+
+**参数**：
+- `name`：工作流名称（路径参数）
+
+**响应示例**：
+
+```json
+{
+  "name": "novel_flow_v1",
+  "description": "小说生成工作流 V1",
+  "model": "deepseek",
+  "type": "sequential"
+}
+```
+
+**错误响应**：
+- `404 Not Found` - 工作流不存在
+
+### 4. 执行工作流（同步）
+
+```
+POST /api/execute
+```
+
+**请求体**：
+
+```json
+{
+  "workflow": "novel_flow_v1",           // 必填：工作流名称
+  "input": "生成一个科幻故事的开头",      // 必填：输入文本
+  "user_id": "user123",                // 必填：用户标识
+  "experiment_id": "exp001",          // 可选：实验ID
+  "trace_id": "trace123",             // 可选：追踪ID（不提供则自动生成）
+  "parameters": {                      // 可选：额外参数
+    "temperature": 0.7,
+    "max_tokens": 1000
+  },
+  "timeout": 30                        // 可选：超时时间（秒）
+}
+```
+
+**响应示例**：
+
+```json
+{
+  "workflow": "novel_flow_v1",
+  "output": "宇宙边缘的星际基地静默地悬浮在黑暗中...",
+  "success": true,
+  "process_time_ms": 1352,
+  "trace_id": "trace123",
+  "metadata": {
+    "user_id": "user123",
+    "workflow": "novel_flow_v1",
+    "experiment_id": "exp001"
+  }
+}
+```
+
+**错误响应**：
+- `404 Not Found` - 工作流不存在
+- `400 Bad Request` - 请求格式错误
+- `408 Request Timeout` - 处理超时
+- `500 Internal Server Error` - 内部错误
+
+### 5. 执行工作流（流式）
+
+```
+POST /api/stream
+```
+
+**请求体**：同同步执行
+
+**响应**：Server-Sent Events (SSE) 格式
+
+```
+event: data
+data: 宇宙边缘的星际
+
+event: data
+data: 基地静默地悬浮在
+
+event: data
+data: 黑暗中...
+
+event: done
+data: {"complete":true}
+```
+
+**错误响应**：
+```
+event: error
+data: {"error":"工作流不存在"}
+```
+
+## API池模型接口
+
+支持在配置中定义多个 API 端点的模型池，实现负载均衡：
+
+```yaml
+model_api_pools:
+  deepseek_pool:
+    base: deepseek
+    endpoints:
+      - url: https://api1.example.com/v1
+        api_key: key1
+      - url: https://api2.example.com/v1
+        api_key: key2
+      - url: https://api3.example.com/v1
+        api_key: key3
+```
+
+访问方式：使用 `pool:deepseek_pool` 作为模型名称即可自动使用池中的多个端点，系统会使用轮询算法在多个端点间分配请求负载。
+
+---
+
+> _最后更新: 2025-07-02_  
+> 如有疑问或建议，请在 Discussion 中反馈。
