@@ -143,24 +143,59 @@ func (c *CustomRagMemoryService) AddSessionToMemory(ctx context.Context, session
     }
 
     body, _ := json.Marshal(reqPayload)
-    httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/add_session", bytes.NewReader(body))
-    if err != nil {
-        return fmt.Errorf("create request failed: %w", err)
-    }
-    httpReq.Header.Set("Content-Type", "application/json")
 
-    resp, err := client.Do(httpReq)
-    if err != nil {
-        return fmt.Errorf("http request error: %w", err)
-    }
-    defer resp.Body.Close()
+    // ------------------------------------------------------------------
+    // FastAPI + Milvus 在首次写入新 tenant 时，如果对应集合尚未创建，
+    // 会先抛出 500（Milvus CollectionNotExists），随后自动去创建集合。
+    // 为了让客户端“写一次就成功”，这里增加一次簡單的重试逻輯：
+    //   1. 仅当网络错误或 HTTP >= 500 时才重试；
+    //   2. 最多 3 次，线性退避 0.5s、1s；
+    //   3. 若遇到 4xx（参数错误、鉴权失败等）立即返回，不做重试。
+    // 这样即可避免第一次 500 导致工作流失败，同时不会给正常错误造成无限重试。
+    // ------------------------------------------------------------------
+    const maxRetries = 3
+    var lastErr error
 
-    if resp.StatusCode >= 300 {
-        respBody, _ := io.ReadAll(resp.Body)
-        return fmt.Errorf("rag service returned %d: %s", resp.StatusCode, string(respBody))
+    for attempt := 1; attempt <= maxRetries; attempt++ {
+        // 每次循环都重新创建 *http.Request，避免 body 在前一次已被读取。
+        httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/add_session", bytes.NewReader(body))
+        if err != nil {
+            return fmt.Errorf("create request failed: %w", err)
+        }
+        httpReq.Header.Set("Content-Type", "application/json")
+
+        resp, err := client.Do(httpReq)
+        if err != nil {
+            lastErr = fmt.Errorf("http request error: %w", err)
+        } else {
+            defer resp.Body.Close()
+            if resp.StatusCode < 300 {
+                return nil // 成功写入
+            }
+
+            respBody, _ := io.ReadAll(resp.Body)
+            lastErr = fmt.Errorf("rag service returned %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+
+            // 遇到 4xx 直接返回，不做重试
+            if resp.StatusCode < 500 {
+                break
+            }
+        }
+
+        // 若未达到最大次数，则等待后重试
+        if attempt < maxRetries {
+            wait := time.Duration(500*attempt) * time.Millisecond
+            logger.S().Warnw("CustomRAG add_session failed, will retry", "attempt", attempt, "max", maxRetries, "err", lastErr, "wait", wait)
+            select {
+            case <-time.After(wait):
+            case <-ctx.Done():
+                return ctx.Err()
+            }
+            continue
+        }
     }
 
-    return nil
+    return lastErr
 }
 
 // SearchMemory queries the external RAG service for related contents.
