@@ -12,11 +12,15 @@ import (
 	"github.com/nvcnvn/adk-golang/pkg/scheduler"
 )
 
-// 定义 API 常量与错误类型
+// 错误常量定义。
+//
+// ErrWorkflowNotFound 表示指定的工作流不存在。
+// ErrInvalidRequest 表示请求参数不合法。
+// ErrInternalError 表示服务器内部错误。
 var (
-	ErrWorkflowNotFound = errors.New("工作流未找到")
-	ErrInvalidRequest   = errors.New("无效的请求")
-	ErrInternalError    = errors.New("内部服务错误")
+	ErrWorkflowNotFound = errors.New("工作流未找到") // 工作流未找到错误
+	ErrInvalidRequest   = errors.New("无效的请求")   // 无效请求错误
+	ErrInternalError    = errors.New("内部服务错误") // 服务器内部错误
 )
 
 // WorkflowRequest 工作流执行请求
