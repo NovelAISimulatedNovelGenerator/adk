@@ -1,0 +1,47 @@
+# Git files
+.git/
+.gitignore
+
+# Development files
+*.md
+*.log
+*.tmp
+temp/
+logs/
+
+# Build artifacts
+adk
+monitor
+apiserver
+*.so
+plugins/
+
+# Dependencies
+vendor/
+
+# Test files
+*_test.go
+test/
+tests/
+Test*
+
+# Configuration (use mounted versions)
+config.yaml
+.env*
+
+# Local development
+.dev/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/
+README*
+CHANGELOG*
