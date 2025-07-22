@@ -8,14 +8,32 @@
 
 ## 任务列表 / Task List
 - [ ] 根据项目需求补充阶段性任务
-- [ ] **为API服务器WorkflowRequest添加archive_id字段**
-  - **Description:** 为 pkg/api 模块的 WorkflowRequest 结构体添加必填的 archive_id 字段，用于标识归档/存档标识符。
+- [ ] **Novel工作流与Quad Memory服务集成测试及交付**
+  - **Description:** 参考 `pkg/flows/novel/framework.go` 和 `pkg/flows/test`，创建完整的 `flows/test` 集成测试框架，实际调用 `pkg/memory/quad_memory_service.go` 进行记忆存储操作，完善 novel plugin 的构建流程，最终完成 Docker 化交付。
+  - **Technical Context:** 需要验证 novel 工作流与 quad_memory_service 的整合，确保在实际场景中能够正常协作并进行记忆存储操作。
   - **Acceptance Criteria:**
-    - [ ] 在 WorkflowRequest 结构体中添加 `ArchiveId string \`json:"archive_id"\`` 字段（必填，不带omitempty）
-    - [ ] 更新相关的 README.md 文档，说明新字段的用途
-    - [ ] 确保 WorkflowRequest 的字段说明包含 archive_id 的描述
-    - [ ] 更新相关的测试用例以包含 archive_id 字段
-    - [ ] 验证 API 调用时 archive_id 字段的序列化/反序列化正常工作
+    - [ ] **集成测试框架**: 创建 `flows/test` 目录，包含完整的集成测试用例
+    - [ ] **Memory服务集成**: 在测试中实际调用 `pkg/memory/quad_memory_service.go` 的 AddQuad 和 SearchQuads 方法
+    - [ ] **Novel工作流测试**: 验证 `pkg/flows/novel/framework.go` 中的各个Agent能正常协作
+    - [ ] **Context传递验证**: 验证 user_id 和 archive_id 在 novel 工作流中的可访问性
+    - [x] **Plugin构建**: 参考 `flows/novel/main.go`，为 `flows/test` 创建相似的 plugin 入口 ✅ **已完成**
+    - [x] **构建流程**: 确保 `go build` 能正常编译 test plugin ✅ **已完成**
+    - [x] **Docker化**: 完成 `docker build` 和相关配置，实现一键启动 ✅ **已完成**
+      - **解决问题**: 修复了Docker环境下插件加载失败问题，移除了docker-compose.yml中覆盖插件的volume挂载
+    - [ ] **文档完善**: 更新相关 README 和使用说明文档
+- [x] **为API服务器WorkflowRequest添加archive_id字段及全链路透传支持** ✅ **已完成**
+  - **Description:** 为 pkg/api 模块的 WorkflowRequest 结构体添加必填的 archive_id 字段，并确保 archive_id 能通过 scheduler.Task、worker回调、context 机制完整传递到 plugin 层（如 framework.go），实现归档标识全链路可用。
+  - **Technical Context:** 基于Plugin系统Context传递机制分析，需要实现与 user_id 相似的完整数据传递链路。
+  - **Acceptance Criteria:**
+    - [ ] **API层**: 在 WorkflowRequest 结构体中添加 `ArchiveId string \`json:"archive_id"\`` 字段（必填，不带omitempty）
+    - [ ] **Scheduler层**: 在 `pkg/scheduler/scheduler.go` 中的 `scheduler.Task` 结构体添加 `ArchiveID string` 字段
+    - [ ] **数据传递**: 在 `pkg/api/service.go` 中创建 Task 时传递 `ArchiveId: req.ArchiveId`
+    - [ ] **Context注入**: 在 worker 回调中添加 `context.WithValue(ctx, "archive_id", task.ArchiveID)` 注入
+    - [ ] **插件层访问**: 验证插件层可通过 `ctx.Value("archive_id")` 获取 archive_id
+    - [ ] **文档更新**: 更新 `pkg/api/README.md` 文档，说明新字段用途与完整传递链路
+    - [ ] **字段说明**: 确保 WorkflowRequest 的字段说明包含 archive_id 的描述
+    - [ ] **测试覆盖**: 更新相关测试用例，覆盖 archive_id 字段和插件可访问性
+    - [ ] **全链路验证**: 验证 API 调用时 archive_id 字段的序列化/反序列化及插件访问正常
 - [x] **设计与实现四元组memory系统的接口** ✅ **已完成**
   - [x] **Task 1: File and Type Scaffolding** ✅
     - **Description:** Create the necessary files and define all the core data structures required for the service.
@@ -122,6 +140,97 @@ SELECT ?s ?p ?o ?g WHERE {
 - **性能优化**: GraphDB基于URI前缀高效过滤
 - **数据隔离**: 每个层次完全隔离，确保数据安全
 - **成本友好**: 完全在GraphDB Free版本限制内
+
+### Plugin系统Context传递机制
+
+#### 背景与重要性
+- **业务需求**: API层的user_id、archive_id等上下文信息需要传递到插件工作流中
+- **技术挑战**: 确保编译型插件系统能够访问HTTP请求中的元数据
+- **关键影响**: 影响个性化处理、记忆服务、归档管理等核心功能
+
+#### 完整数据传递链路分析
+
+**user_id传递机制** ✅ **已完全支持**
+```
+HTTP请求 → WorkflowRequest.UserId → scheduler.Task.UserID → context.WithValue → 插件ctx.Value("user_id")
+```
+
+**关键实现点**:
+1. **API层**: `pkg/api/service.go:97` - 将`req.UserId`传递给`scheduler.Task.UserID`
+2. **Scheduler层**: `pkg/scheduler/scheduler.go:105` - Worker调用`s.processor(task.Ctx, task)`
+3. **Context注入**: Worker回调中通过`context.WithValue(ctx, "user_id", task.UserID)`注入
+4. **插件访问**: 在`framework.go`回调函数中可直接使用`ctx.Value("user_id")`
+
+**插件使用示例**:
+```go
+// 在 pkg/flows/novel/framework.go 中
+executionLayer.Agent.SetBeforeAgentCallback(func(ctx context.Context, msg string) (string, bool) {
+    // ✅ 可以直接获取user_id
+    if userID, ok := ctx.Value("user_id").(string); ok {
+        log.Printf("[执行层] 处理用户 %s 的请求", userID)
+        // 可用于个性化处理、记忆服务调用等
+    }
+    return "处理完成", true
+})
+```
+
+**archive_id传递机制** ❌ **尚未支持，需要补全**
+
+**当前缺失环节**:
+1. ❗ `scheduler.Task`结构体缺少`ArchiveID`字段
+2. ❗ Worker回调缺少`context.WithValue(ctx, "archive_id", task.ArchiveID)`注入
+3. ❗ 插件层无法通过`ctx.Value("archive_id")`获取
+
+**完整解决方案** (需要实施):
+1. **扩展scheduler.Task结构体**:
+   ```go
+   // pkg/scheduler/scheduler.go
+   type Task struct {
+       Ctx       context.Context
+       Workflow  string
+       Input     string
+       UserID    string
+       ArchiveID string  // ❗ 新增字段
+       ResultChan chan Result
+   }
+   ```
+
+2. **修改API层数据传递**:
+   ```go
+   // pkg/api/service.go
+   task := &scheduler.Task{
+       Ctx:        timeoutCtx,
+       Workflow:   req.Workflow,
+       Input:      req.Input,
+       UserID:     req.UserId,
+       ArchiveID:  req.ArchiveId,  // ❗ 新增传递
+       ResultChan: resultCh,
+   }
+   ```
+
+3. **在Worker回调中注入context**:
+   ```go
+   // 在processor实现中
+   ctx = context.WithValue(ctx, "archive_id", task.ArchiveID)
+   ```
+
+4. **插件层访问**:
+   ```go
+   // pkg/flows/novel/framework.go
+   if archiveID, ok := ctx.Value("archive_id").(string); ok {
+       log.Printf("[执行层] 归档ID: %s", archiveID)
+       // 可用于数据归档、版本管理等
+   }
+   ```
+
+#### 技术影响总结
+
+| 字段 | 当前状态 | 插件可访问性 | 需要的工作 |
+|------|---------|-------------|----------|
+| `user_id` | ✅ 完全支持 | ✅ 可直接使用 `ctx.Value("user_id")` | 无 |
+| `archive_id` | ❌ 未支持 | ❌ 无法访问 | 需要补全整条传递链路 |
+
+**结论**: Plugin系统**可以**读取user_id，但**无法**读取archive_id。要实现archive_id的完整支持，需要同时修改API层、Scheduler层和Context注入机制。
 
 ## 进度记录 / Progress Log
 | 日期 | 负责人 | 阶段 | 备注 |

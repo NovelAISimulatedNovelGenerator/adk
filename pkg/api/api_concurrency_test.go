@@ -58,8 +58,10 @@ func TestExecuteEndpointConcurrency(t *testing.T) {
         go func() {
             defer wg.Done()
             body, _ := json.Marshal(map[string]interface{}{
-                "workflow": "bench_flow",
-                "input":    "hello",
+                "workflow":   "bench_flow",
+                "input":      "hello",
+                "user_id":    "test_user_123",
+                "archive_id": "test_archive_456",
             })
             resp, err := client.Post(testServer.URL+"/api/execute", "application/json", bytes.NewReader(body))
             if err != nil {

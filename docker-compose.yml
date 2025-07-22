@@ -9,7 +9,6 @@ services:
       - "8080:8080"
     volumes:
       - ./config.yaml:/app/config.yaml:ro
-      - ./plugins:/app/plugins:rw
     environment:
       - ADK_CONFIG=/app/config.yaml
       - ADDR=:8080

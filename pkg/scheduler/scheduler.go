@@ -10,10 +10,11 @@ import (
 // ResultChan 必须非 nil，调度器完成后会写入结果。
 // Cancel 方法由调用方传入 context 控制。
 type Task struct {
-    Ctx      context.Context // 上下文，用于取消
-    Workflow string          // 工作流名称
-    Input    string          // 原始输入
-    UserID   string          // 用户标识
+    Ctx       context.Context // 上下文，用于取消
+    Workflow  string          // 工作流名称
+    Input     string          // 原始输入
+    UserID    string          // 用户标识
+    ArchiveID string          // 归档标识符
 
     ResultChan chan Result // 返回结果
 }

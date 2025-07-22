@@ -30,6 +30,11 @@ func NewHttpServer(manager *flow.Manager, addr string) *HttpServer {
 		if !ok {
 			return "", errors.New("workflow not found")
 		}
+		
+		// 注入用户标识和归档标识到context中，供插件层访问
+		ctx = context.WithValue(ctx, "user_id", task.UserID)
+		ctx = context.WithValue(ctx, "archive_id", task.ArchiveID)
+		
 		return ag.Process(ctx, task.Input)
 	}
 	sched := scheduler.NewWorkerPoolScheduler(8, 32, proc)

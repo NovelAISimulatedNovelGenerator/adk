@@ -99,6 +99,7 @@ type WorkflowRequest struct {
     Workflow     string                 `json:"workflow"`                // 工作流名称
     Input        string                 `json:"input"`                   // 输入文本
     UserId       string                 `json:"user_id"`                 // 用户标识
+    ArchiveId    string                 `json:"archive_id"`              // 归档标识符
     ExperimentId string                 `json:"experiment_id,omitempty"` // 实验ID（可选）
     TraceId      string                 `json:"trace_id,omitempty"`      // 追踪ID（可选）
     Parameters   map[string]interface{} `json:"parameters,omitempty"`    // 额外参数
@@ -110,6 +111,7 @@ type WorkflowRequest struct {
 - `Workflow`: 要执行的工作流名称，必须已注册到 flow.Manager
 - `Input`: 工作流的输入文本或数据
 - `UserId`: 用户标识，用于追踪和记忆系统
+- `ArchiveId`: 归档标识符，用于数据归档和版本管理，**必填字段**，通过完整链路传递到插件层
 - `ExperimentId`: 实验标识，用于A/B测试等场景
 - `TraceId`: 请求追踪标识，用于日志关联
 - `Parameters`: 额外的参数字典，传递给工作流

@@ -28,6 +28,7 @@ type WorkflowRequest struct {
 	Workflow     string                 `json:"workflow"`                // 工作流名称
 	Input        string                 `json:"input"`                   // 输入文本
 	UserId       string                 `json:"user_id"`                 // 用户标识
+	ArchiveId    string                 `json:"archive_id"`              // 归档标识符
 	ExperimentId string                 `json:"experiment_id,omitempty"` // 实验ID（可选）
 	TraceId      string                 `json:"trace_id,omitempty"`      // 追踪ID（可选）
 	Parameters   map[string]interface{} `json:"parameters,omitempty"`    // 额外参数
@@ -95,6 +96,7 @@ func (s *WorkflowService) Execute(ctx context.Context, req WorkflowRequest) (*Wo
         Workflow:   req.Workflow,
         Input:      req.Input,
         UserID:     req.UserId,
+        ArchiveID:  req.ArchiveId,
         ResultChan: resultCh,
     }
 
