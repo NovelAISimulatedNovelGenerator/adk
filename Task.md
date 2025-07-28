@@ -25,15 +25,15 @@
   - **Description:** 为 pkg/api 模块的 WorkflowRequest 结构体添加必填的 archive_id 字段，并确保 archive_id 能通过 scheduler.Task、worker回调、context 机制完整传递到 plugin 层（如 framework.go），实现归档标识全链路可用。
   - **Technical Context:** 基于Plugin系统Context传递机制分析，需要实现与 user_id 相似的完整数据传递链路。
   - **Acceptance Criteria:**
-    - [ ] **API层**: 在 WorkflowRequest 结构体中添加 `ArchiveId string \`json:"archive_id"\`` 字段（必填，不带omitempty）
-    - [ ] **Scheduler层**: 在 `pkg/scheduler/scheduler.go` 中的 `scheduler.Task` 结构体添加 `ArchiveID string` 字段
-    - [ ] **数据传递**: 在 `pkg/api/service.go` 中创建 Task 时传递 `ArchiveId: req.ArchiveId`
-    - [ ] **Context注入**: 在 worker 回调中添加 `context.WithValue(ctx, "archive_id", task.ArchiveID)` 注入
-    - [ ] **插件层访问**: 验证插件层可通过 `ctx.Value("archive_id")` 获取 archive_id
+    - [x] **API层**: 在 WorkflowRequest 结构体中添加 `ArchiveId string \`json:"archive_id"\`` 字段（必填，不带omitempty）
+    - [x] **Scheduler层**: 在 `pkg/scheduler/scheduler.go` 中的 `scheduler.Task` 结构体添加 `ArchiveID string` 字段
+    - [x] **数据传递**: 在 `pkg/api/service.go` 中创建 Task 时传递 `ArchiveId: req.ArchiveId`
+    - [x] **Context注入**: 在 worker 回调中添加 `context.WithValue(ctx, "archive_id", task.ArchiveID)` 注入
+    - [x] **插件层访问**: 验证插件层可通过 `ctx.Value("archive_id")` 获取 archive_id
     - [ ] **文档更新**: 更新 `pkg/api/README.md` 文档，说明新字段用途与完整传递链路
-    - [ ] **字段说明**: 确保 WorkflowRequest 的字段说明包含 archive_id 的描述
-    - [ ] **测试覆盖**: 更新相关测试用例，覆盖 archive_id 字段和插件可访问性
-    - [ ] **全链路验证**: 验证 API 调用时 archive_id 字段的序列化/反序列化及插件访问正常
+    - [x] **字段说明**: 确保 WorkflowRequest 的字段说明包含 archive_id 的描述
+    - [x] **测试覆盖**: 更新相关测试用例，覆盖 archive_id 字段和插件可访问性
+    - [x] **全链路验证**: 验证 API 调用时 archive_id 字段的序列化/反序列化及插件访问正常
 - [x] **设计与实现四元组memory系统的接口** ✅ **已完成**
   - [x] **Task 1: File and Type Scaffolding** ✅
     - **Description:** Create the necessary files and define all the core data structures required for the service.
@@ -237,6 +237,66 @@ executionLayer.Agent.SetBeforeAgentCallback(func(ctx context.Context, msg string
 | ---- | ------ | ---- | ---- |
 | 2025-07-22 | Cascade | 初始化 | 创建 Task.md |
 | 2025-07-22 | Gemini | 开发中 | 开始设计与实现四元组memory系统的接口，已完成文件和类型脚手架。 |
+
+---
+
+## 新增任务：统一项目配置管理方案
+
+### 任务背景
+当前项目中配置参数分散在环境变量和config.yaml文件中，需要统一配置管理方案，确保所有业务配置集中管理，同时保持必要的系统级环境变量支持。
+
+### 当前配置分布统计
+- **环境变量使用：** `ADK_CONFIG`, `DEEPSEEK_API_KEY`, `GOOGLE_API_KEY`, `RAG_SERVICE_URL` 等
+- **配置文件使用：** `plugin_dir`, `default_flow`, `db.dsn`, `queue.*`, `model_api_pools` 等
+- **冲突配置：** 模型API密钥和端点同时存在环境变量和配置文件结构
+
+### 统一方案：配置文件为主，环境变量覆盖
+**技术栈：**
+- 配置管理：viper (支持YAML、JSON、TOML、env)
+- 配置验证：go-playground/validator
+- 开发环境：godotenv (.env文件支持)
+
+### 实施计划
+- [ ] **配置结构重构**：扩展config.yaml结构，包含所有当前环境变量配置
+- [ ] **代码迁移**：将pkg/models/deepseek.go、pkg/models/gemini.go中的环境变量读取改为配置读取
+- [ ] **viper集成**：在pkg/config中集成viper，支持环境变量覆盖
+- [ ] **.env支持**：添加.env文件支持，用于开发环境默认值
+- [ ] **配置验证**：实现配置结构和必填项验证
+- [ ] **向后兼容**：确保现有环境变量在过渡期内仍能工作
+- [ ] **文档更新**：更新README.md，说明新的配置使用方法
+- [ ] **Docker更新**：更新docker-compose.yml，移除不必要的volume挂载
+- [ ] **示例配置**：更新config.example.yaml，包含所有配置项示例
+
+### 技术实现要点
+```yaml
+# 扩展后的config.yaml结构示例
+plugin_dir: ./plugins
+default_flow: novel_flow_v1
+log_level: info
+
+# 统一模型配置
+models:
+  deepseek:
+    api_key: "your-deepseek-key"
+    endpoint: "https://api.deepseek.com/v1"
+  gemini:
+    api_key: "your-gemini-key"
+    endpoint: "https://generativelanguage.googleapis.com/v1beta"
+
+# 外部服务配置
+services:
+  rag_service:
+    url: "http://localhost:8080"
+
+# 原有配置保持不变
+db:
+  dsn: "postgres://user:pass@localhost:5432/adk?sslmode=disable"
+
+queue:
+  impl: redis
+  addr: "redis://localhost:6379"
+  stream: adk_tasks
+```
 
 ---
 

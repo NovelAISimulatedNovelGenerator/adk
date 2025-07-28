@@ -20,7 +20,7 @@ type QuadMemoryConfig struct {
 	RepositoryID string        // GraphDB 仓库ID，例如 "main"
 	Username     string        // GraphDB 认证用户名
 	Password     string        // GraphDB 认证密码
-	MaxRetries   int          // 最大重试次数
+	MaxRetries   int           // 最大重试次数
 	RetryBackoff time.Duration // 重试间隔时间
 }
 
@@ -135,14 +135,11 @@ func (s *QuadMemoryService) doRequest(req *http.Request, result any) (*http.Resp
 	return nil, lastErr
 }
 
-
 // HierarchicalContext 表示用于逻辑分区的层次化上下文
 // 支持多层次数据组织，如 租户 -> 故事 -> 章节/角色
 type HierarchicalContext struct {
-	TenantID    string `json:"tenant_id"`              // 必需：租户标识符
-	StoryID     string `json:"story_id,omitempty"`     // 可选：故事标识符
-	ChapterID   string `json:"chapter_id,omitempty"`   // 可选：章节标识符
-	CharacterID string `json:"character_id,omitempty"` // 可选：角色标识符
+	TenantID string `json:"tenant_id"`          // 必需：租户标识符
+	StoryID  string `json:"story_id,omitempty"` // 可选：故事标识符
 	// 可根据需要添加更多层次
 }
 
@@ -163,11 +160,11 @@ type AddQuadRequest struct {
 
 // QuadSearchQuery 定义支持层次化上下文的搜索条件
 type QuadSearchQuery struct {
-	Subject   string                `json:"subject,omitempty"`   // 可选：按主语过滤
-	Predicate string                `json:"predicate,omitempty"` // 可选：按谓语过滤
-	Object    string                `json:"object,omitempty"`    // 可选：按宾语过滤
-	Context   *HierarchicalContext  `json:"context,omitempty"`   // 可选：用于过滤的层次化上下文
-	Scope     string                `json:"scope,omitempty"`     // 可选：查询范围 ("exact", "story", "tenant")
+	Subject   string               `json:"subject,omitempty"`   // 可选：按主语过滤
+	Predicate string               `json:"predicate,omitempty"` // 可选：按谓语过滤
+	Object    string               `json:"object,omitempty"`    // 可选：按宾语过滤
+	Context   *HierarchicalContext `json:"context,omitempty"`   // 可选：用于过滤的层次化上下文
+	Scope     string               `json:"scope,omitempty"`     // 可选：查询范围 ("exact", "story", "tenant")
 }
 
 // SearchQuadsRequest 搜索四元组的请求载荷
@@ -191,12 +188,6 @@ func (s *QuadMemoryService) buildGraphURI(ctx *HierarchicalContext) string {
 
 	if ctx.StoryID != "" {
 		uri += fmt.Sprintf(":story:%s", ctx.StoryID)
-
-		if ctx.ChapterID != "" {
-			uri += fmt.Sprintf(":chapter:%s", ctx.ChapterID)
-		} else if ctx.CharacterID != "" {
-			uri += fmt.Sprintf(":character:%s", ctx.CharacterID)
-		}
 	}
 
 	return uri
@@ -246,8 +237,8 @@ func (s *QuadMemoryService) AddQuad(ctx context.Context, hierarchicalCtx *Hierar
 	// 如果未提供 ID 则生成
 	resultQuad := quad
 	if resultQuad.ID == "" {
-		resultQuad.ID = fmt.Sprintf("%s-%s-%s-%d", 
-			hierarchicalCtx.TenantID, 
+		resultQuad.ID = fmt.Sprintf("%s-%s-%s-%d",
+			hierarchicalCtx.TenantID,
 			strings.ReplaceAll(quad.Subject, ":", "-"),
 			strings.ReplaceAll(quad.Predicate, ":", "-"),
 			time.Now().UnixNano())
@@ -266,7 +257,7 @@ func (s *QuadMemoryService) AddQuad(ctx context.Context, hierarchicalCtx *Hierar
 		return nil, fmt.Errorf("添加四元组失败: %w", err)
 	}
 
-	s.logger.Infow("成功添加四元组", 
+	s.logger.Infow("成功添加四元组",
 		"graph_uri", graphURI,
 		"subject", quad.Subject,
 		"predicate", quad.Predicate,
@@ -301,7 +292,7 @@ func (s *QuadMemoryService) executeSPARQLUpdate(ctx context.Context, sparqlUpdat
 	}
 	defer resp.Body.Close()
 
-	s.logger.Debugw("SPARQL 更新执行成功", 
+	s.logger.Debugw("SPARQL 更新执行成功",
 		"status_code", resp.StatusCode,
 		"update_url", updateURL)
 
@@ -334,7 +325,7 @@ func (s *QuadMemoryService) SearchQuads(ctx context.Context, query QuadSearchQue
 		return nil, fmt.Errorf("执行搜索查询失败: %w", err)
 	}
 
-	s.logger.Infow("成功执行搜索查询", 
+	s.logger.Infow("成功执行搜索查询",
 		"scope", query.Scope,
 		"results_count", len(results))
 
@@ -473,7 +464,7 @@ func (s *QuadMemoryService) executeSPARQLQuery(ctx context.Context, sparqlQuery 
 		quads = append(quads, quad)
 	}
 
-	s.logger.Debugw("SPARQL 查询执行成功", 
+	s.logger.Debugw("SPARQL 查询执行成功",
 		"status_code", resp.StatusCode,
 		"query_url", queryURL,
 		"results_count", len(quads))
