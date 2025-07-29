@@ -47,7 +47,8 @@ type SaveNovelRagDataService struct {
 // NewSaveNovelRagDataService 创建新的服务实例
 func NewSaveNovelRagDataService(config SaveNovelRagDataConfig) *SaveNovelRagDataService {
 	if config.LLMModel == "" {
-		config.LLMModel = "deepseek-chat"
+		// 使用配置文件中的GLM池模型
+		config.LLMModel = "pool:glm_pool"
 	}
 
 	return &SaveNovelRagDataService{

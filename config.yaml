@@ -10,3 +10,12 @@ queue:
   impl: redis
   addr: "redis://localhost:6379"
   stream: adk_tasks
+
+# NewAPI 模型池配置
+model_api_pools:
+  # GLM-4.5 模型池 (通过NewAPI代理)
+  glm_pool:
+    base: "glm-4.5"  # 实际发送给NewAPI的模型名称
+    endpoints:
+      - url: "http://localhost:3000"
+        apikey: "sk-xxx"
