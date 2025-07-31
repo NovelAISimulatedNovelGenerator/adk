@@ -12,6 +12,7 @@ import (
 	"time"
 	
 	"github.com/nvcnvn/adk-golang/pkg/api"
+	"github.com/nvcnvn/adk-golang/pkg/memory"
 	"github.com/nvcnvn/adk-golang/pkg/config"
 	"github.com/nvcnvn/adk-golang/pkg/flow"
 	"github.com/nvcnvn/adk-golang/pkg/models"
@@ -55,6 +56,38 @@ func main() {
 	if err != nil {
 		log.Fatalf("创建插件加载器失败: %v", err)
 	}
+
+	// 注册 Quad Memory 服务
+	log.Printf("验证 Quad Memory 服务...")
+	qms := memory.NewQuadMemoryService(memory.QuadMemoryConfig{
+		BaseURL:      "http://localhost:7200",
+		RepositoryID: "main",
+		MaxRetries:   3,
+		RetryBackoff: 1 * time.Second,
+	})
+	
+	// 执行健康检查
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	
+	if err := qms.HealthCheck(ctx); err != nil {
+		log.Printf("Quad Memory 服务健康检查失败: %v", err)
+		log.Printf("警告: Quad Memory 服务不可用，系统将继续启动但相关功能可能受限")
+	} else {
+		log.Printf("Quad Memory 服务健康检查成功")
+	}
+	
+	// 注册 Custom RAG Memory 服务
+	log.Printf("验证 Custom RAG Memory 服务...")
+	cragms := memory.NewCustomRagMemoryServiceWithDefaults()
+	
+	// 执行 Custom RAG Memory 健康检查
+	if err := cragms.HealthCheck(ctx); err != nil {
+		log.Printf("Custom RAG Memory 服务健康检查失败: %v", err)
+		log.Printf("警告: Custom RAG Memory 服务不可用，系统将继续启动但相关功能可能受限")
+	} else {
+		log.Printf("Custom RAG Memory 服务健康检查成功")
+	}
 	
 	// 启动加载器
 	loader.Start()
@@ -88,10 +121,10 @@ func main() {
 	log.Printf("收到信号 %v，关闭中...", sig)
 	
 	// 优雅关闭
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
 	
-	if err := server.Stop(ctx); err != nil {
+	if err := server.Stop(shutdownCtx); err != nil {
 		log.Fatalf("服务器关闭失败: %v", err)
 	}
 	
