@@ -6,11 +6,11 @@ package novel
 import (
     "context"
     "fmt"
-    "log"
     "strings"
     "sync"
 
     "github.com/nvcnvn/adk-golang/pkg/agents"
+    "github.com/nvcnvn/adk-golang/pkg/logger"
 )
 
 // Build 构造 NovelAI DeepSeek 分层智能体。
@@ -96,7 +96,7 @@ func Build() *agents.Agent {
     
     // 决策层处理逻辑
     decisionLayer.Agent.SetBeforeAgentCallback(func(ctx context.Context, msg string) (string, bool) {
-        log.Println("[决策层] 处理输入：", truncateString(msg, 30))
+        logger.S().Infof("[决策层] 处理输入：%s", truncateString(msg, 30))
         // 依次调用子代理，而非recursively调用整个决策层Process
         currentMessage := msg
         
@@ -120,13 +120,13 @@ func Build() *agents.Agent {
             return fmt.Sprintf("[评估层错误]: %v", err), true
         }
         
-        log.Println("[决策层] 完成处理")
+        logger.S().Info("[决策层] 完成处理")
         return evalMsg, true
     })
     
     // 执行层处理逻辑
     executionLayer.Agent.SetBeforeAgentCallback(func(ctx context.Context, msg string) (string, bool) {
-        log.Println("[执行层] 处理输入：", truncateString(msg, 30))
+        logger.S().Infof("[执行层] 处理输入：%s", truncateString(msg, 30))
         
         // 收集所有子代理的结果
         type agentResult struct {
@@ -160,7 +160,7 @@ func Build() *agents.Agent {
         results := make(map[string]string)
         for result := range resultsCh {
             if result.err != nil {
-                log.Printf("[执行层] 子代理 %s 错误: %v", result.agent, result.err)
+                logger.S().Errorf("[执行层] 子代理 %s 错误: %v", result.agent, result.err)
                 continue
             }
             results[result.agent] = result.output
@@ -173,13 +173,13 @@ func Build() *agents.Agent {
             return fmt.Sprintf("[格式化错误]: %v", err), true
         }
         
-        log.Println("[执行层] 完成处理")
+        logger.S().Info("[执行层] 完成处理")
         return formatterOutput, true
     })
     
     // 根代理处理逻辑
     root.Agent.SetBeforeAgentCallback(func(ctx context.Context, msg string) (string, bool) {
-        log.Println("[根代理] 处理输入：", truncateString(msg, 30))
+        logger.S().Infof("[根代理] 处理输入：%s", truncateString(msg, 30))
         
         // 决策层处理
         decisionOutput, err := decisionLayer.Agent.Process(ctx, msg)
@@ -193,7 +193,7 @@ func Build() *agents.Agent {
             return fmt.Sprintf("[执行层错误]: %v", err), true
         }
         
-        log.Println("[根代理] 完成处理")
+        logger.S().Info("[根代理] 完成处理")
         return executionOutput, true
     })
 

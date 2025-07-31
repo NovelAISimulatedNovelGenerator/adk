@@ -12,6 +12,8 @@ import (
     "io/fs"
 
     "github.com/fsnotify/fsnotify"
+    "github.com/nvcnvn/adk-golang/pkg/logger"
+    "go.uber.org/zap"
 )
 
 // Loader 监听插件目录并管理工作流插件的生命周期。
@@ -71,6 +73,12 @@ func (l *Loader) loadPlugin(path string) {
     if err != nil {
         log.Printf("[plugin_loader] 打开插件 %s 失败: %v", path, err)
         return
+    }
+    // 尝试向插件注入统一的 *zap.Logger
+    if sym, err := p.Lookup("SetLogger"); err == nil {
+        if fn, ok := sym.(func(*zap.Logger)); ok {
+            fn(logger.L())
+        }
     }
     sym, err := p.Lookup("Plugin")
     if err != nil {

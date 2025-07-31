@@ -69,6 +69,17 @@ func S() *zap.SugaredLogger {
 	return L().Sugar()
 }
 
+// Set 允许外部显式注入统一的 *zap.Logger（例如在插件加载完成后）。
+// 若传入 nil，则保持现有全局 logger 不变。
+func Set(l *zap.Logger) {
+	if l == nil {
+		return
+	}
+	global = l
+	// 将标准库 log 重定向到新的 logger，保证输出一致
+	_ = zap.RedirectStdLog(l)
+}
+
 // Sync 刷新日志缓冲区，通常在程序退出时调用
 func Sync() {
 	_ = L().Sync()
