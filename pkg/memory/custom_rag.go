@@ -43,7 +43,8 @@ func NewCustomRagMemoryService(baseURL string, similarityTopK int) *CustomRagMem
 		similarityTopK = 10
 	}
 	if baseURL == "" {
-		baseURL = "http://localhost:18000"
+		// to be inside docker container
+		baseURL = "http://host.docker.internal:18000"
 	}
 	return &CustomRagMemoryService{
 		BaseURL:        strings.TrimRight(baseURL, "/"),
@@ -113,15 +114,18 @@ type healthCheckResponse struct {
 // -----------------------------------------------------------------------------
 
 // AddSessionToMemory uploads the session to the external RAG service.
-// tenant_id == session.AppName (可根据需要调整)
+// Uses session.AppName + session.ID concatenation as tenant_id to ensure archive-level isolation.
+// This matches the SearchMemory logic where userID+archiveID are concatenated.
 func (c *CustomRagMemoryService) AddSessionToMemory(ctx context.Context, session *sessions.Session) error {
 	c.mu.RLock()
 	baseURL := c.BaseURL
 	client := c.httpClient
 	c.mu.RUnlock()
 
+	// 使用 AppName(userID) + ID(archiveID) 拼接作为 tenant_id，确保archive级别隔离
+	tenantID := fmt.Sprintf("%s_%s", session.AppName, session.ID)
 	reqPayload := addSessionRequest{
-		TenantID:  session.AppName,
+		TenantID:  tenantID,
 		SessionID: session.ID,
 	}
 
@@ -209,16 +213,18 @@ func (c *CustomRagMemoryService) AddSessionToMemory(ctx context.Context, session
 }
 
 // SearchMemory queries the external RAG service for related contents.
-func (c *CustomRagMemoryService) SearchMemory(ctx context.Context, appName, userID, query string) (*SearchMemoryResponse, error) {
+// Uses userID+archiveID concatenation as tenant_id to ensure archive-level isolation.
+func (c *CustomRagMemoryService) SearchMemory(ctx context.Context, appName, userID, archiveID, query string) (*SearchMemoryResponse, error) {
 	c.mu.RLock()
 	baseURL := c.BaseURL
 	client := c.httpClient
 	topK := c.SimilarityTopK
 	c.mu.RUnlock()
 
-	// 使用 appName 作为 tenant_id
+	// 使用 userID+archiveID 拼接作为 tenant_id，确保archive级别隔离
+	tenantID := fmt.Sprintf("%s_%s", userID, archiveID)
 	reqPayload := searchMemoryRequest{
-		TenantID: appName,
+		TenantID: tenantID,
 		Query:    query,
 		TopK:     topK,
 	}

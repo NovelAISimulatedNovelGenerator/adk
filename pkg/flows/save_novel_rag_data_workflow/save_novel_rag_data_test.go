@@ -15,9 +15,10 @@ type MockMemoryService struct {
 }
 
 type SearchMemoryCall struct {
-	AppName string
-	UserID  string
-	Query   string
+	AppName   string
+	UserID    string
+	ArchiveID string
+	Query     string
 }
 
 func (m *MockMemoryService) AddSessionToMemory(ctx context.Context, session *sessions.Session) error {
@@ -25,11 +26,12 @@ func (m *MockMemoryService) AddSessionToMemory(ctx context.Context, session *ses
 	return nil
 }
 
-func (m *MockMemoryService) SearchMemory(ctx context.Context, appName, userID, query string) (*memory.SearchMemoryResponse, error) {
+func (m *MockMemoryService) SearchMemory(ctx context.Context, appName, userID, archiveID, query string) (*memory.SearchMemoryResponse, error) {
 	m.searchMemoryCalls = append(m.searchMemoryCalls, SearchMemoryCall{
-		AppName: appName,
-		UserID:  userID,
-		Query:   query,
+		AppName:   appName,
+		UserID:    userID,
+		ArchiveID: archiveID,
+		Query:     query,
 	})
 	return &memory.SearchMemoryResponse{Memories: []*memory.MemoryResult{}}, nil
 }

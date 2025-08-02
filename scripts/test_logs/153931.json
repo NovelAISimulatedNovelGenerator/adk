@@ -1,0 +1,1 @@
+{"workflow":"test_rag_tool_flow","output":"工具 'rag_write_main' 执行成功:\n{\n  \"result\": \"Content ingested into RAG for user=test_user_123, archive=archive_456\"\n}\n\n","success":true,"metadata":{"experiment_id":"","user_id":"test_user_123","workflow":"test_rag_tool_flow"},"process_time_ms":8717,"trace_id":"8cb89de6-f389-4a04-bef1-2d5d4b1820e3"}

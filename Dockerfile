@@ -16,11 +16,9 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build plugins first (需要 CGO 支持)
+# Build plugins automatically using script (需要 CGO 支持)
 RUN mkdir -p /app/plugins
-#RUN CGO_ENABLED=1 GOOS=linux go build -buildmode=plugin -o /app/plugins/novel_flow_v4.so ./flows/novel_v4/main.go
-#RUN CGO_ENABLED=1 GOOS=linux go build -buildmode=plugin -o /app/plugins/rag_test_flow.so ./flows/rag_test/main.go
-RUN CGO_ENABLED=1 GOOS=linux go build -buildmode=plugin -o /app/plugins/test.so ./flows/test/main.go
+RUN ls -la scripts/ && chmod +x scripts/build_plugins.sh && sh scripts/build_plugins.sh
 
 # Build the apiserver binary (启用 CGO 以支持插件系统)
 RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags '-w -s' -o apiserver ./cmd/apiserver

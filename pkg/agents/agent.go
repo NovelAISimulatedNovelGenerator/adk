@@ -18,8 +18,9 @@ package agents
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"fmt"
+	"log"
+	"strings"
 	"sync"
 
 	"github.com/nvcnvn/adk-golang/pkg/events"
@@ -155,7 +156,6 @@ type Config struct {
 	BeforeAgentCallback BeforeAgentCallback
 	AfterAgentCallback  AfterAgentCallback
 }
-
 
 // Option defines a function type for configuring an agent.
 type Option func(*Config)
@@ -338,6 +338,14 @@ func (a *Agent) Process(ctx context.Context, message string) (string, error) {
 		return "", err
 	}
 
+	// Parse and execute function calls if present
+	response, err = a.processFunctionCalls(ctx, response)
+	if err != nil {
+		span.SetAttribute("function_call_error", err.Error())
+		log.Printf("[Agent] 工具调用失败，agent: %s, 错误: %v", a.name, err)
+		// Continue with original response instead of failing
+	}
+
 	span.SetAttribute("output.length", fmt.Sprintf("%d", len(response)))
 
 	// Run after agent callback if present
@@ -396,6 +404,70 @@ func (a *Agent) getToolDefinitions() []map[string]interface{} {
 	return defs
 }
 
+// processFunctionCalls parses model response for function calls and executes them
+func (a *Agent) processFunctionCalls(ctx context.Context, response string) (string, error) {
+	lines := strings.Split(strings.TrimSpace(response), "\n")
+	var result strings.Builder
+	var foundFunctionCalls bool
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Try to parse as tool call JSON
+		var toolCall struct {
+			ToolName   string                 `json:"tool_name"`
+			Parameters map[string]interface{} `json:"parameters"`
+		}
+
+		if err := json.Unmarshal([]byte(line), &toolCall); err == nil && toolCall.ToolName != "" {
+			foundFunctionCalls = true
+			log.Printf("[Agent] 检测到工具调用: %s", toolCall.ToolName)
+
+			// Find the corresponding tool
+			var targetTool tools.Tool
+			for _, tool := range a.tools {
+				if tool.Name() == toolCall.ToolName {
+					targetTool = tool
+					break
+				}
+			}
+
+			if targetTool == nil {
+				result.WriteString(fmt.Sprintf("错误：未找到工具 '%s'\n", toolCall.ToolName))
+				continue
+			}
+
+			// Execute the tool
+			toolResult, err := targetTool.Execute(ctx, toolCall.Parameters)
+			if err != nil {
+				result.WriteString(fmt.Sprintf("工具 '%s' 执行失败: %v\n", toolCall.ToolName, err))
+				continue
+			}
+
+			// Format the result
+			resultJSON, _ := json.MarshalIndent(toolResult, "", "  ")
+			result.WriteString(fmt.Sprintf("工具 '%s' 执行成功:\n%s\n\n", toolCall.ToolName, string(resultJSON)))
+		} else {
+			// Not a tool call, include as regular text
+			if result.Len() > 0 {
+				result.WriteString("\n")
+			}
+			result.WriteString(line)
+		}
+	}
+
+	if foundFunctionCalls {
+		log.Printf("[Agent] 工具调用处理完成，agent: %s", a.name)
+		return result.String(), nil
+	}
+
+	// No function calls found, return original response
+	return response, nil
+}
+
 // Name returns the name of the agent.
 func (a *Agent) Name() string {
 	return a.name
@@ -423,12 +495,12 @@ func (a *Agent) Tools() []tools.Tool {
 
 // SetBeforeAgentCallback allows setting the callback after creation.
 func (a *Agent) SetBeforeAgentCallback(cb BeforeAgentCallback) {
-    a.beforeAgentCallback = cb
+	a.beforeAgentCallback = cb
 }
 
 // SetAfterAgentCallback allows setting the after-callback after creation.
 func (a *Agent) SetAfterAgentCallback(cb AfterAgentCallback) {
-    a.afterAgentCallback = cb
+	a.afterAgentCallback = cb
 }
 
 // SubAgents returns the sub-agents of this agent.

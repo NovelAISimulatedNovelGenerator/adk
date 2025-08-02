@@ -15,7 +15,7 @@ queue:
 model_api_pools:
   # GLM-4.5 模型池 (通过NewAPI代理)
   glm_pool:
-    base: "glm-4.5"  # 实际发送给NewAPI的模型名称
+    base: "kimi-k2-turbo-preview"  # 实际发送给NewAPI的模型名称
     endpoints:
-      - url: "http://localhost:3000"
-        apikey: "sk-xxx"
+      - url: "http://host.docker.internal:3000"
+        apikey: "sk-rac1XoSpt3eESULMNGKxAvBQq2WwcqIoSJMhsg2ubOU6tiJQ"

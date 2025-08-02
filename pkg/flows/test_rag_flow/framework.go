@@ -53,7 +53,7 @@ func Build() *agents.Agent {
 			}
 
 			// 2. 搜索相似内容
-			resp, err := ragMem.SearchMemory(ctx, "rag_test", "", testContent)
+			resp, err := ragMem.SearchMemory(ctx, "rag_test", "user1", "archive1", testContent)
 			if err != nil {
 				return fmt.Sprintf("{\"error\":%q}", err.Error()), true
 			}

@@ -45,6 +45,7 @@ type MemoryService interface {
 	// A session may be added multiple times during its lifetime.
 	AddSessionToMemory(ctx context.Context, session *sessions.Session) error
 
-	// SearchMemory searches for sessions that match the query.
-	SearchMemory(ctx context.Context, appName, userID, query string) (*SearchMemoryResponse, error)
+	// SearchMemory searches for sessions that match the query within specific archive.
+	// archiveID provides isolation - different archives have separate memory spaces.
+	SearchMemory(ctx context.Context, appName, userID, archiveID, query string) (*SearchMemoryResponse, error)
 }
